@@ -21,11 +21,16 @@ typedef struct {
 #define CELL_WIDTH 48
 #define CELL_HEIGHT 48
 #define CELLS_PER_ROW (TEXTURE_WIDTH / CELL_WIDTH)
-#define USED_ROWS 2
+#define TOTAL_CELL_COUNT 231
+#define FONT_FAMILY L"Droid Sans Fallback"
+#define FONT_SIZE 36
+#define OUTLINE_MAX 8
+#define OUTLINE_MIN 1
 // The engine build we're looking at stores 1/1.5 of the cell width instead of
 // the actual cell width
 #define GAME_WIDTH_MULTIPLIER 1.5
 
+#if 0
 glyph_range_t glyphRanges[USED_ROWS];
 uint8_t widths[USED_ROWS][CELLS_PER_ROW];
 
@@ -36,21 +41,43 @@ void SetRanges() {
         L"nopqrstuvwxyz ", // yes, that last space is actually used
         /*    .colOffset = */ 0,
         /*          .row = */ 0,
-        /*         .font = */ new Font(new FontFamily(L"Open Sans"), 44,
+        /*         .font = */ new Font(new FontFamily(L"Droid Sans"), 40,
             FontStyleRegular, UnitPixel),
-        /* .fontFallback = */ new Font(new FontFamily(L"Arial Unicode MS"), 44,
+        /* .fontFallback = */ new Font(new FontFamily(L"Droid Sans Fallback"), 40,
             FontStyleRegular, UnitPixel)
     };
   glyphRanges[1] = {
       /*   .characters = */ L"/:-;!?'.@#%~*&`()°^>+<ﾉ･=\"$´,[\\]_{|}",
       /*    .colOffset = */ 0,
       /*          .row = */ 1,
-      /*         .font = */ new Font(new FontFamily(L"Open Sans"), 44,
+      /*         .font = */ new Font(new FontFamily(L"Droid Sans"), 40,
                                      FontStyleRegular, UnitPixel),
-      /* .fontFallback = */ new Font(new FontFamily(L"Arial Unicode MS"), 44,
+      /* .fontFallback = */ new Font(new FontFamily(L"Droid Sans Fallback"), 40,
                                      FontStyleRegular, UnitPixel)};
+  glyphRanges[2] = {
+      /*   .characters = */ L"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+      /*    .colOffset = */ 0,
+      /*          .row = */ 2,
+      /*         .font = */ new Font(new FontFamily(L"Droid Sans"), 40,
+          FontStyleRegular, UnitPixel),
+      /* .fontFallback = */ new Font(new FontFamily(L"Droid Sans Fallback"), 40,
+          FontStyleRegular, UnitPixel) };
+
+  glyphRanges[3] = {
+      /*   .characters = */ L",.:;?!\"°`´\"\"",
+      /*    .colOffset = */ 0,
+      /*          .row = */ 3,
+      /*         .font = */ new Font(new FontFamily(L"Droid Sans"), 40,
+          FontStyleRegular, UnitPixel),
+      /* .fontFallback = */ new Font(new FontFamily(L"Droid Sans Fallback"), 40,
+          FontStyleRegular, UnitPixel) };
   memset(widths, 0, USED_ROWS * CELLS_PER_ROW);
 }
+#endif
+
+// upper bound
+uint8_t widths[TOTAL_CELL_COUNT];
+uint8_t outlineWidths[TOTAL_CELL_COUNT];
 
 // ===== CONFIGURATION END ===== //
 
@@ -88,12 +115,20 @@ void main() {
   // http://stackoverflow.com/questions/3354136/access-violation-in-image-destructor
   // yeah IDK either
   {
-    SetRanges();
+    // SetRanges();
+    memset(widths, 0, TOTAL_CELL_COUNT);
 
     SolidBrush brush(Color(255, 255, 255, 255));
     Matrix identity;
-    Bitmap bitmap(TEXTURE_WIDTH, CELL_HEIGHT * USED_ROWS);
+    // Bitmap bitmap(TEXTURE_WIDTH, CELL_HEIGHT * USED_ROWS);
+    Bitmap bitmap(
+        TEXTURE_WIDTH,
+        ceil((double)TOTAL_CELL_COUNT / (double)CELLS_PER_ROW) * CELL_HEIGHT);
+    Bitmap outlineBitmap(
+        TEXTURE_WIDTH,
+        ceil((double)TOTAL_CELL_COUNT / (double)CELLS_PER_ROW) * CELL_HEIGHT);
     Graphics graphics(&bitmap);
+    Graphics outlineGraphics(&outlineBitmap);
 
     // unfortunately we need regular old GDI later
     HDC tempHdc = graphics.GetHDC();
@@ -102,81 +137,138 @@ void main() {
 
     graphics.Clear(Color(0, 0, 0, 0));
     graphics.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
+    graphics.SetSmoothingMode(SmoothingModeAntiAlias);
+    graphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
+    outlineGraphics.Clear(Color(0, 0, 0, 0));
+    outlineGraphics.SetTextRenderingHint(TextRenderingHintAntiAliasGridFit);
+    outlineGraphics.SetSmoothingMode(SmoothingModeAntiAlias);
+    outlineGraphics.SetInterpolationMode(InterpolationModeHighQualityBicubic);
 
-    for (size_t i = 0; i < sizeof(glyphRanges) / sizeof(glyph_range_t); i++) {
-      glyph_range_t* range = glyphRanges + i;
+    /*
+    FontFamily fontFamily(L"Droid Sans Fallback");
+    Font font(&fontFamily, 40,
+        FontStyleRegular, UnitPixel);
+    WCHAR foo[] = L"abc黴asd\0def黴ghc";
+    wchar_t *bar = foo;
+    int ci = 0;
+    while (bar < foo + wcslen(foo))
+    {
+        GraphicsPath path;
+        StringFormat strformat = StringFormat::GenericTypographic();
+        PointF origin2(ci * 48, 100);
+        origin2.Y += font.GetSize() *
+            fontFamily.GetCellDescent(FontStyleRegular) /
+            fontFamily.GetEmHeight(FontStyleRegular);
+        strformat.SetLineAlignment(StringAlignmentFar);
+        path.AddString(bar, 1, &fontFamily, FontStyleRegular, font.GetSize(),
+    origin2, &strformat);
 
-      FontFamily fontFamily, fontFamilyFallback;
-      LOGFONTW logFont, logFontFallback;
-      HFONT hfont, hfontFallback;
-      range->font->GetFamily(&fontFamily);
-      range->fontFallback->GetFamily(&fontFamilyFallback);
-      range->font->GetLogFontW(&graphics, &logFont);
-      hfont = CreateFontIndirectW(&logFont);
-      range->fontFallback->GetLogFontW(&graphics, &logFontFallback);
-      hfontFallback = CreateFontIndirectW(&logFontFallback);
-
-      for (size_t j = 0; j < wcslen(range->characters); j++) {
-        size_t col = range->colOffset + j;
-        // size_t row = range->row;
-        size_t row = i;
-
-        Font* curFont = range->font;
-        FontFamily* curFontFamily = &fontFamily;
-        SelectObject(hdc, hfont);
-
-        uint16_t glyphIndex;
-        GetGlyphIndicesW(hdc, range->characters + j, 1, &glyphIndex,
-                         GGI_MARK_NONEXISTING_GLYPHS);
-        // 0xFFFF = nonexistant
-        if (glyphIndex == 0xFFFF) {
-          curFont = range->fontFallback;
-          curFontFamily = &fontFamilyFallback;
-          SelectObject(hdc, hfontFallback);
+        for (int i = 1; i<10; ++i)
+        {
+            Pen pen(Color(48, 255, 0, 0), i);
+            pen.SetLineJoin(LineJoinRound);
+            graphics.DrawPath(&pen, &path);
         }
 
-        // empirical testing indicates there are some off-by-one errors
-        PointF origin(1 + col * CELL_WIDTH, (row + 1) * CELL_HEIGHT);
-        // origin.Y is baseline, so we need to shift it up by the font's cell
-        // descent
-        // (i.e. maximum glyph height *below* baseline) to always fit the
-        // bounding box.
-        // GetCellDescent()'s return value is in design units, so we need to do
-        // this calculation to get pixels
-        origin.Y -= curFont->GetSize() *
-                    curFontFamily->GetCellDescent(FontStyleRegular) /
-                    curFontFamily->GetEmHeight(FontStyleRegular);
+        ci++;
+        bar++;
+    }
+    */
 
-        ABC abc;
-        // A-width is overhang (e.g. -2 for "glyph is drawn 2px left of
-        // origin").
-        // We can't support this so we need to shift origin right by that
-        // amount.
-        // Also, we can only get this info from GDI.
-        GetCharABCWidthsW(hdc, range->characters[col], range->characters[col],
-                          &abc);
-        if (abc.abcA < 0) origin.X -= abc.abcA;
+    FontFamily fontFamily(FONT_FAMILY);
+    Font font(&fontFamily, FONT_SIZE, FontStyleRegular, UnitPixel);
+    LOGFONTW logFont;
+    HFONT hfont;
+    font.GetLogFontW(&graphics, &logFont);
+    hfont = CreateFontIndirectW(&logFont);
+    SelectObject(hdc, hfont);
 
-        graphics.DrawDriverString((uint16_t*)(range->characters + col), 1,
-                                  curFont, &brush, &origin,
-                                  DriverStringOptionsCmapLookup, &identity);
+    FILE* infile = fopen("input.bin", "rb");
+    wchar_t overwriteThis[TOTAL_CELL_COUNT];
+    fread(overwriteThis, 2, TOTAL_CELL_COUNT, infile);
+    fclose(infile);
 
-        // again, we can't (reliably) get this from GDI+. See docs for what
-        // these values are.
-        double rawWidth = (abc.abcA > 0 ? abc.abcA : 0) + abc.abcB +
-                          (abc.abcC > 0 ? abc.abcC : 0);
-
-        // empirical testing, see above
-        widths[row][col] = ceil(rawWidth / GAME_WIDTH_MULTIPLIER) + 1;
+    wchar_t* c = overwriteThis;
+    int row = 0;
+    int col = 0;
+    for (size_t i = 0; i < TOTAL_CELL_COUNT; i++) {
+      if (*c == L'\0') {
+        c++;
+        continue;
       }
+      int row = i / CELLS_PER_ROW;
+      int col = i % CELLS_PER_ROW;
+
+      // empirical testing indicates there are some off-by-one errors
+      PointF driverStringOrigin(1 + col * CELL_WIDTH, (row + 1) * CELL_HEIGHT);
+      PointF pathOrigin(driverStringOrigin);
+
+      ABC abc;
+      // A-width is overhang (e.g. -2 for "glyph is drawn 2px left of
+      // origin").
+      // We can't support this so we need to shift origin right by that
+      // amount.
+      // Also, we can only get this info from GDI.
+      GetCharABCWidthsW(hdc, *(uint32_t*)c, *(uint32_t*)c, &abc);
+      if (abc.abcA < 0) driverStringOrigin.X -= abc.abcA;
+
+      // origin.Y is baseline, so we need to shift it up by the font's cell
+      // descent
+      // (i.e. maximum glyph height *below* baseline) to always fit the
+      // bounding box.
+      // GetCellDescent()'s return value is in design units, so we need to do
+      // this calculation to get pixels
+      driverStringOrigin.Y -= font.GetSize() *
+                                  fontFamily.GetCellDescent(FontStyleRegular) /
+                                  fontFamily.GetEmHeight(FontStyleRegular) +
+                              5;
+      pathOrigin.Y -= 5;
+
+      PointF outlineOrigin(pathOrigin);
+      outlineOrigin.X += 4;
+
+      {
+          GraphicsPath path;
+          StringFormat strformat = StringFormat::GenericTypographic();
+          strformat.SetLineAlignment(StringAlignmentFar);
+          path.AddString(c, 1, &fontFamily, FontStyleRegular, font.GetSize(),
+              outlineOrigin, &strformat);
+
+          for (int j = OUTLINE_MIN; j < OUTLINE_MAX; j++) {
+              Pen pen(Color(255 / ceil(j / 1.5), 255, 255, 255), j);
+              pen.SetLineJoin(LineJoinRound);
+              outlineGraphics.DrawPath(&pen, &path);
+          }
+      }
+      GraphicsPath path;
+      StringFormat strformat = StringFormat::GenericTypographic();
+      strformat.SetLineAlignment(StringAlignmentFar);
+      path.AddString(c, 1, &fontFamily, FontStyleRegular, font.GetSize(),
+          pathOrigin, &strformat);
+      graphics.FillPath(&brush, &path);
+
+      /*graphics.DrawDriverString((uint16_t *)&glyphIndex, 1,
+      curFont, &brush, &origin,
+      NULL, &identity);*/
+
+      // again, we can't (reliably) get this from GDI+. See docs for what
+      // these values are.
+      double rawWidth = (abc.abcA > 0 ? abc.abcA : 0) + abc.abcB +
+                        (abc.abcC > 0 ? abc.abcC : 0);
+      widths[i] = ceil(rawWidth / GAME_WIDTH_MULTIPLIER) + 1;
+
+      // UTF-16 uses 2 *or 4* bytes per codepoint -> we can't just c++
+      c = CharNextW(c);
     }
 
     CLSID myClsId;
     GetEncoderClsid(L"image/png", &myClsId);
     bitmap.Save(L"output.png", &myClsId);
+    outlineBitmap.Save(L"outputOutline.png", &myClsId);
 
     FILE* fp = fopen("widths.bin", "wb");
-    fwrite(widths, 1, USED_ROWS * CELLS_PER_ROW, fp);
+    // fwrite(widths, 1, USED_ROWS * CELLS_PER_ROW, fp);
+    fwrite(widths, 1, TOTAL_CELL_COUNT, fp);
     fflush(fp);
     fclose(fp);
   }
