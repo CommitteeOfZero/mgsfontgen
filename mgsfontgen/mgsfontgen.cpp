@@ -21,9 +21,9 @@ typedef struct {
 #define CELL_WIDTH 48
 #define CELL_HEIGHT 48
 #define CELLS_PER_ROW (TEXTURE_WIDTH / CELL_WIDTH)
-#define TOTAL_CELL_COUNT 231
+#define TOTAL_CELL_COUNT 8000
 #define FONT_FAMILY L"Droid Sans Fallback"
-#define FONT_SIZE 36
+#define FONT_SIZE 38
 #define OUTLINE_MAX 8
 #define OUTLINE_MIN 1
 // The engine build we're looking at stores 1/1.5 of the cell width instead of
@@ -188,6 +188,11 @@ void main() {
     fread(overwriteThis, 2, TOTAL_CELL_COUNT, infile);
     fclose(infile);
 
+    wchar_t *override_4_12 = L"¹⁸";
+    wchar_t *override_4_14 = L"⁻¹";
+    wchar_t *override_4_15 = L"⁻²⁴";
+    // wchar_t *override_4_16 = L"‡タ"; - unfortunately this is too wide
+
     wchar_t* c = overwriteThis;
     int row = 0;
     int col = 0;
@@ -199,6 +204,18 @@ void main() {
       int row = i / CELLS_PER_ROW;
       int col = i % CELLS_PER_ROW;
 
+      bool useOverride = false;
+      wchar_t *pOverride;
+
+      if (row == 4 && (col == 12 || col == 14 || col == 15 || col == 16))
+      {
+          useOverride = true;
+          if (col == 12) pOverride = override_4_12;
+          if (col == 14) pOverride = override_4_14;
+          if (col == 15) pOverride = override_4_15;
+          //if (col == 16) pOverride = override_4_16;
+      }
+
       // empirical testing indicates there are some off-by-one errors
       PointF driverStringOrigin(1 + col * CELL_WIDTH, (row + 1) * CELL_HEIGHT);
       PointF pathOrigin(driverStringOrigin);
@@ -209,7 +226,19 @@ void main() {
       // We can't support this so we need to shift origin right by that
       // amount.
       // Also, we can only get this info from GDI.
-      GetCharABCWidthsW(hdc, *(uint32_t*)c, *(uint32_t*)c, &abc);
+      if (useOverride) {
+          ABC temp;
+          for (int i = 0; i < wcslen(pOverride); i++) {
+              uint32_t tc = *(pOverride + i);
+              GetCharABCWidthsW(hdc, tc, tc, &temp);
+              abc.abcA += temp.abcA;
+              abc.abcB += temp.abcB;
+              abc.abcC += temp.abcC;
+          }
+      }
+      else {
+          GetCharABCWidthsW(hdc, *(uint32_t*)c, *(uint32_t*)c, &abc);
+      }
       if (abc.abcA < 0) driverStringOrigin.X -= abc.abcA;
 
       // origin.Y is baseline, so we need to shift it up by the font's cell
@@ -222,7 +251,7 @@ void main() {
                                   fontFamily.GetCellDescent(FontStyleRegular) /
                                   fontFamily.GetEmHeight(FontStyleRegular) +
                               5;
-      pathOrigin.Y -= 5;
+      pathOrigin.Y -= 3;
 
       PointF outlineOrigin(pathOrigin);
       outlineOrigin.X += 4;
@@ -231,8 +260,15 @@ void main() {
           GraphicsPath path;
           StringFormat strformat = StringFormat::GenericTypographic();
           strformat.SetLineAlignment(StringAlignmentFar);
-          path.AddString(c, 1, &fontFamily, FontStyleRegular, font.GetSize(),
-              outlineOrigin, &strformat);
+
+          if (useOverride) {
+              path.AddString(pOverride, -1, &fontFamily, FontStyleRegular, font.GetSize(),
+                  outlineOrigin, &strformat);
+          }
+          else {
+              path.AddString(c, 1, &fontFamily, FontStyleRegular, font.GetSize(),
+                  outlineOrigin, &strformat);
+          }
 
           for (int j = OUTLINE_MIN; j < OUTLINE_MAX; j++) {
               Pen pen(Color(255 / ceil(j / 1.5), 255, 255, 255), j);
@@ -243,8 +279,14 @@ void main() {
       GraphicsPath path;
       StringFormat strformat = StringFormat::GenericTypographic();
       strformat.SetLineAlignment(StringAlignmentFar);
-      path.AddString(c, 1, &fontFamily, FontStyleRegular, font.GetSize(),
-          pathOrigin, &strformat);
+      if (useOverride) {
+          path.AddString(pOverride, -1, &fontFamily, FontStyleRegular, font.GetSize(),
+              pathOrigin, &strformat);
+      }
+      else {
+          path.AddString(c, 1, &fontFamily, FontStyleRegular, font.GetSize(),
+              pathOrigin, &strformat);
+      }
       graphics.FillPath(&brush, &path);
 
       /*graphics.DrawDriverString((uint16_t *)&glyphIndex, 1,
