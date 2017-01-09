@@ -114,7 +114,7 @@ void main() {
     fclose(infile);
 
     wchar_t* override_4_12 = L"¹⁸";
-    wchar_t* override_4_14 = L"⁻¹";
+    wchar_t* override_4_14 = L"⁻¹⁹";
     wchar_t* override_4_15 = L"⁻²⁴";
     // wchar_t *override_4_16 = L"‡タ"; - unfortunately this is too wide
 
@@ -132,7 +132,7 @@ void main() {
       bool useOverride = false;
       wchar_t* pOverride;
 
-      if (row == 4 && (col == 12 || col == 14 || col == 15 || col == 16)) {
+      if (row == 4 && (col == 12 || col == 14 || col == 15)) {
         useOverride = true;
         if (col == 12) pOverride = override_4_12;
         if (col == 14) pOverride = override_4_14;
