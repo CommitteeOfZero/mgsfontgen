@@ -23,8 +23,8 @@ typedef struct {
 #define CELL_HEIGHT 48
 #define CELLS_PER_ROW (TEXTURE_WIDTH / CELL_WIDTH)
 #define TOTAL_CELL_COUNT 8000
-#define FONT_FAMILY L"Droid Sans Fallback"
-#define FONT_SIZE 38
+#define FONT_FAMILY L"Noto Sans CJK JP Regular"
+#define FONT_SIZE 36
 #define OUTLINE_MAX 8
 #define OUTLINE_MIN 1
 #define Y_SAFETY_MARGIN -3
@@ -140,8 +140,7 @@ void main() {
         // if (col == 16) pOverride = override_4_16;
       }
 
-      // empirical testing indicates there are some off-by-one errors
-      PointF origin(1 + col * CELL_WIDTH, (row + 1) * CELL_HEIGHT);
+      PointF origin(col * CELL_WIDTH, (row + 1) * CELL_HEIGHT);
 
       ABC abc;
       // A-width is overhang (e.g. -2 for "glyph is drawn 2px left of
@@ -201,6 +200,8 @@ void main() {
       // these values are.
       double rawWidth = (abc.abcA > 0 ? abc.abcA : 0) + abc.abcB +
                         (abc.abcC > 0 ? abc.abcC : 0);
+
+	  // empirical testing indicates there are some off-by-one errors
       widths[i] = ceil(rawWidth / GAME_WIDTH_MULTIPLIER) + 1;
 
       // UTF-16 uses 2 *or 4* bytes per codepoint -> we can't just c++
